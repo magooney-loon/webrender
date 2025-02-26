@@ -1,0 +1,72 @@
+{{template "base" .}}
+
+{{define "title"}}System Metrics Dashboard{{end}}
+
+{{define "home-content"}}
+<div data-layout="container">
+    {{template "header" (dict 
+        "Title" "System Dashboard"
+        "User" .User 
+        "CurrentPage" .CurrentPage
+        "Status" .Status
+    )}}
+
+    {{template "overview" .}}
+
+    <!-- Tabs for detailed stats categories -->
+    <div data-tabs>
+        <div data-tab-list>
+            <button data-tab-button="system">System</button>
+            <button data-tab-button="requests">Requests & Performance</button>
+            <button data-tab-button="analytics">Analytics</button>
+            {{if .Status.RecentErrors}}
+            <button data-tab-button="errors">Errors</button>
+            {{end}}
+        </div>
+        
+        <!-- System Tab Content -->
+        <div data-tab-content="system">
+            {{template "system_tab" .Status}}
+        </div>
+        
+        <!-- Requests & Performance Tab Content -->
+        <div data-tab-content="requests">
+            {{template "requests_tab" .Status}}
+        </div>
+        
+        <!-- Analytics Tab Content -->
+        <div data-tab-content="analytics">
+            {{template "analytics_tab" .Status}}
+        </div>
+        
+        {{if .Status.RecentErrors}}
+        <!-- Errors Tab Content -->
+        <div data-tab-content="errors">
+            <div data-grid="1">
+                <div data-card>
+                    <h3 data-text="h3">Recent Errors</h3>
+                    <table data-metrics-table>
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Path</th>
+                                <th>Error</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{range .Status.RecentErrors}}
+                            <tr>
+                                <td>{{.Time}}</td>
+                                <td data-cell="path">{{.Path}}</td>
+                                <td>{{.Error}}</td>
+                            </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {{end}}
+    </div>
+</div>
+{{end}} 

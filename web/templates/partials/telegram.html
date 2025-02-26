@@ -1,0 +1,37 @@
+{{define "telegram"}}
+<!-- Telegram Notification Toggle -->
+<button data-telegram-toggle class="telegram-toggle" aria-label="Toggle Telegram Notifications">
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M22 2L11 13"></path>
+    <path d="M22 2L15 22L11 13L2 9L22 2Z"></path>
+  </svg>
+</button>
+
+<!-- Telegram Settings Dialog -->
+<div data-telegram-dialog data-overlay>
+  <div data-dialog>
+    <h3 data-text="h3">Telegram Notifications</h3>
+    <p data-text="body">Configure server notifications via Telegram bot</p>
+    
+    <div data-telegram-settings>
+      <div data-setting-row>
+        <label data-switch>
+          <input type="checkbox" data-telegram-enable>
+          <span data-slider></span>
+        </label>
+        <span>Enable Notifications</span>
+      </div>
+      
+      <div data-bot-info>
+        <p>1. Start our bot: <a href="https://t.me/YourBotName" target="_blank">@YourBotName</a></p>
+        <p>2. Enter admin password</p>
+        <p>3. Get your chat ID from the bot</p>
+        <input type="text" data-input data-telegram-chat-id placeholder="Enter your Telegram Chat ID">
+      </div>
+    </div>
+
+    <button data-button="primary" data-telegram-save>Save Settings</button>
+    <button data-button="secondary" data-telegram-cancel>Cancel</button>
+  </div>
+</div>
+{{end}}

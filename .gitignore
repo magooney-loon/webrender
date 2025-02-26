@@ -1,0 +1,70 @@
+# Go specific
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+/vendor/
+go.work
+
+# SQLite
+*.db
+*.db-shm
+*.db-wal
+/data/
+
+# Binary output directory
+/bin/
+/dist/
+
+# IDE specific
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment files
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+*.log
+/logs/
+
+# Temporary files
+/tmp/
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage.txt
+coverage.html
+
+# Web assets
+/web/node_modules/
+/web/dist/
+/web/tmp/
+*.min.css
+*.min.js
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Certificate files
+*.pem
+*.key
+*.crt
+*.csr
+*.srl
+
+# Build/Deploy artifacts
+*.tar.gz
+*.zip
+.terraform/
+*.tfstate
+*.tfstate.backup 

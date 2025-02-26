@@ -1,0 +1,230 @@
+/* Navigation and Header Components */
+
+/* Navigation Bar */
+[data-nav] {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.5rem;
+  background: var(--surface-2);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+
+[data-nav-logo] {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-decoration: none;
+  color: var(--text);
+}
+
+[data-nav-logo] img {
+  width: 2rem;
+  height: 2rem;
+}
+
+[data-nav-toggle] {
+  display: none;
+  padding: 0.5rem;
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+}
+
+[data-nav-links] {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+[data-nav-link] {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  color: var(--text-2);
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+}
+
+[data-nav-link]:hover {
+  color: var(--text);
+  background: var(--surface-3);
+}
+
+[data-nav-link][data-active="true"] {
+  color: var(--text);
+  background: var(--surface-3);
+}
+
+[data-button="logout"] {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  color: var(--danger);
+  background: var(--danger-surface);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+[data-button="logout"]:hover {
+  background: var(--danger-surface-hover);
+  border-color: var(--danger-border-hover);
+}
+
+/* Header */
+[data-header] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: 1.5rem;
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border);
+}
+
+[data-header-left] {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+[data-header-left] [data-text="h2"] {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+[data-header-right] {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Refresh Controls */
+[data-refresh-controls] {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+[data-refresh-interval] {
+  min-width: 180px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+[data-button="refresh"] {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: var(--transition-base);
+}
+
+[data-button="refresh"]:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--accent-color);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+[data-button="refresh"] svg {
+  transition: transform 0.3s ease;
+}
+
+[data-button="refresh"]:hover svg {
+  transform: rotate(180deg);
+}
+
+/* Mobile Navigation */
+@media (max-width: 768px) {
+  [data-nav-toggle] {
+    display: block;
+  }
+
+  [data-nav-links] {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow-md);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  [data-nav-links][data-visible="true"] {
+    display: flex;
+  }
+
+  [data-nav-link],
+  [data-button="logout"] {
+    width: 100%;
+    justify-content: flex-start;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-sm);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+
+  [data-nav-link]:hover,
+  [data-button="logout"]:hover {
+    background: var(--surface-3);
+    color: var(--text-primary);
+  }
+
+  /* Mobile Header */
+  [data-header] {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+  }
+
+  [data-header-right] {
+    width: 100%;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  [data-refresh-controls] {
+    width: 100%;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  [data-refresh-controls] select {
+    width: 100%;
+  }
+
+  [data-refresh-controls] button {
+    width: 100%;
+  }
+} 

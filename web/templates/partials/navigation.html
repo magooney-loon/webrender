@@ -1,0 +1,46 @@
+{{ define "navigation" }}
+<nav data-nav>
+    <a href="/system/admin" data-nav-logo>
+        <img src="/static/images/logo.svg" alt="WebServer Logo">
+        <span data-text="h2">WebServer</span>
+    </a>
+
+    <button data-nav-toggle aria-label="Toggle navigation" aria-expanded="false">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+            <path fill="none" d="M0 0h24v24H0z"/>
+            <path d="M3 4h18v2H3V4zm0 7h18v2H3v-2zm0 7h18v2H3v-2z" fill="currentColor"/>
+        </svg>
+    </button>
+
+    <div data-nav-links>
+        <a href="/system/admin" data-nav-link {{if eq .CurrentPage "home"}}data-active="true"{{end}}>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16">
+                <path fill="none" d="M0 0h24v24H0z"/>
+                <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" fill="currentColor"/>
+            </svg>
+            Dashboard
+        </a>
+        <a href="/system/settings" data-nav-link {{if eq .CurrentPage "settings"}}data-active="true"{{end}}>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16">
+                <path fill="none" d="M0 0h24v24H0z"/>
+                <path d="M12 1l9.5 5.5v11L12 23l-9.5-5.5v-11L12 1zm0 2.311L4.5 7.653v8.694l7.5 4.342 7.5-4.342V7.653L12 3.311zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-2a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" fill="currentColor"/>
+            </svg>
+            Settings
+        </a>
+        <a href="/system/health" target="_blank" data-nav-link {{if eq .CurrentPage "health"}}data-active="true"{{end}}>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16">
+                <path fill="none" d="M0 0h24v24H0z"/>
+                <path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10zm0-2a8 8 0 1 0 0-16 8 8 0 0 0 0 16zm-1-5h2v2h-2v-2zm0-8h2v6h-2V7z" fill="currentColor"/>
+            </svg>
+            Health API
+        </a>
+        <a href="/system/logout" data-button="logout">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16">
+                <path fill="none" d="M0 0h24v24H0z"/>
+                <path d="M5 22a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H5zm10-6l5-4-5-4v3H9v2h6v3z" fill="currentColor"/>
+            </svg>
+            Logout
+        </a>
+    </div>
+</nav>
+{{ end }}

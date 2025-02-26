@@ -1,0 +1,42 @@
+{{define "system_tab"}}
+<div data-grid="3">
+    <div data-card>
+        <h3 data-text="h3">Server Information</h3>
+        <table data-metrics-table>
+            <tbody>
+                <tr><td>Start Time</td><td>{{.StartTime}}</td></tr>
+                <tr><td>Go Version</td><td>{{.GoVersion}}</td></tr>
+                <tr><td>Goroutines</td><td>{{.NumGoroutines}}</td></tr>
+                <tr><td>CPU Cores</td><td>{{.NumCPU}}</td></tr>
+                <tr><td>CGO Calls</td><td>{{.NumCGO}}</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div data-card>
+        <h3 data-text="h3">Cache Performance</h3>
+        <table data-metrics-table>
+            <tbody>
+                <tr><td>Hit Rate</td><td>{{if .CacheStats.TotalHits}}{{printf "%.2f" .CacheStats.HitRate}}%{{else}}0.00%{{end}}</td></tr>
+                <tr><td>Miss Rate</td><td>{{if .CacheStats.TotalHits}}{{printf "%.2f" .CacheStats.MissRate}}%{{else}}0.00%{{end}}</td></tr>
+                <tr><td>Total Hits</td><td>{{if .CacheStats.TotalHits}}{{.CacheStats.TotalHits}}{{else}}0{{end}}</td></tr>
+                <tr><td>Total Misses</td><td>{{if .CacheStats.TotalHits}}{{.CacheStats.TotalMisses}}{{else}}0{{end}}</td></tr>
+                <tr><td>Evictions</td><td>{{if .CacheStats.TotalHits}}{{.CacheStats.Evictions}}{{else}}0{{end}}</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div data-card>
+        <h3 data-text="h3">Memory Statistics</h3>
+        <table data-metrics-table>
+            <tbody>
+                <tr><td>Memory Usage</td><td>{{printf "%.2f" .MemoryStats.MemoryUsage}}%</td></tr>
+                <tr><td>Heap Objects</td><td>{{.MemoryStats.HeapObjects}}</td></tr>
+                <tr><td>GC Count</td><td>{{.MemoryStats.NumGC}}</td></tr>
+                <tr><td>Last GC</td><td>{{.MemoryStats.LastGC}}</td></tr>
+                <tr><td>Last GC Duration</td><td>{{.MemoryStats.LastGCDuration}}</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{{end}} 

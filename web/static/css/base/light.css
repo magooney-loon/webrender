@@ -1,0 +1,27 @@
+/* Light Theme */
+:root[data-theme="light"] {
+  /* Background Colors */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f5;
+  --bg-tertiary: #e5e5e5;
+  
+  /* Text Colors */
+  --text-primary: #000000;
+  --text-secondary: rgba(0, 0, 0, 0.7);
+  --text-muted: rgba(0, 0, 0, 0.5);
+  
+  /* Border Colors */
+  --border-color: rgba(0, 0, 0, 0.1);
+  
+  /* Accent Colors */
+  --accent-color: var(--color-blue);
+  --success-color: var(--color-blue);
+  --warning-color: var(--color-yellow);
+  --error-color: var(--color-red);
+  
+  /* Component Colors */
+  --card-bg: var(--bg-secondary);
+  --input-bg: var(--bg-tertiary);
+  --button-bg: var(--bg-tertiary);
+  --overlay-bg: rgba(0, 0, 0, 0.1);
+} 

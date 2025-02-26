@@ -1,0 +1,312 @@
+{{template "base" .}}
+
+{{define "title"}}Server Configuration{{end}}
+
+{{define "head"}}
+<link rel="stylesheet" href="/static/css/components/settings.css">
+<script src="/static/js/settings.js" defer></script>
+{{end}}
+
+{{define "settings-content"}}
+<div data-layout="container">
+    {{template "header" dict "Title" "Server Settings" "Description" "Modify server configuration"}}
+
+    <div data-card="settings">
+        <form data-form="settings" method="POST" action="/system/settings">
+            <div data-tab-list>
+                <button type="button" data-tab-button="server">Server</button>
+                <button type="button" data-tab-button="security">Security</button>
+                <button type="button" data-tab-button="auth">Authentication</button>
+                <button type="button" data-tab-button="logging">Logging</button>
+                <button type="button" data-tab-button="admin">Admin</button>
+                <button type="button" data-tab-button="advanced">Advanced</button>
+            </div>
+
+            <!-- Server Settings Tab -->
+            <div data-tab-content="server" data-active="true">
+                <h3 data-text="h3">Server Configuration</h3>
+                <div data-grid="2">
+                    <div data-form-group>
+                        <label for="go_env">Environment</label>
+                        <select id="go_env" name="GO_ENV">
+                            <option value="development" {{if eq .Config.GO_ENV "development"}}selected{{end}}>Development</option>
+                            <option value="production" {{if eq .Config.GO_ENV "production"}}selected{{end}}>Production</option>
+                            <option value="testing" {{if eq .Config.GO_ENV "testing"}}selected{{end}}>Testing</option>
+                        </select>
+                    </div>
+                    <div data-form-group>
+                        <label for="server_port">Server Port</label>
+                        <input type="number" id="server_port" name="SERVER_PORT" value="{{.Config.SERVER_PORT}}" min="1" max="65535">
+                    </div>
+                    <div data-form-group>
+                        <label for="server_host">Server Host</label>
+                        <input type="text" id="server_host" name="SERVER_HOST" value="{{.Config.SERVER_HOST}}">
+                    </div>
+                    <div data-form-group>
+                        <label for="server_read_timeout">Read Timeout</label>
+                        <input type="text" id="server_read_timeout" name="SERVER_READ_TIMEOUT" value="{{.Config.SERVER_READ_TIMEOUT}}" placeholder="e.g. 15s">
+                    </div>
+                    <div data-form-group>
+                        <label for="server_write_timeout" data-text="label">Write Timeout</label>
+                        <input type="text" data-input="text" id="server_write_timeout" name="SERVER_WRITE_TIMEOUT" value="{{.Config.SERVER_WRITE_TIMEOUT}}" placeholder="e.g. 15s">
+                    </div>
+                    <div data-form-group>
+                        <label for="server_shutdown_timeout" data-text="label">Shutdown Timeout</label>
+                        <input type="text" data-input="text" id="server_shutdown_timeout" name="SERVER_SHUTDOWN_TIMEOUT" value="{{.Config.SERVER_SHUTDOWN_TIMEOUT}}" placeholder="e.g. 10s">
+                    </div>
+                    <div data-form-group>
+                        <label for="server_max_header_size" data-text="label">Max Header Size</label>
+                        <input type="text" data-input="text" id="server_max_header_size" name="SERVER_MAX_HEADER_SIZE" value="{{.Config.SERVER_MAX_HEADER_SIZE}}" placeholder="e.g. 1MB">
+                    </div>
+                    <div data-form-group>
+                        <label for="server_max_body_size" data-text="label">Max Body Size</label>
+                        <input type="text" data-input="text" id="server_max_body_size" name="SERVER_MAX_BODY_SIZE" value="{{.Config.SERVER_MAX_BODY_SIZE}}" placeholder="e.g. 10MB">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Security Settings Tab -->
+            <div data-tab-content="security">
+                <h3 data-text="h3">Security Configuration</h3>
+                <div data-grid="2">
+                    <div data-form-group="checkbox">
+                        <input type="checkbox" id="security_enable_tls" name="SECURITY_ENABLE_TLS" {{if eq .Config.SECURITY_ENABLE_TLS "true"}}checked{{end}}>
+                        <label for="security_enable_tls">Enable TLS</label>
+                    </div>
+                    <div data-form-group>
+                        <label for="tls_cert_path">TLS Certificate Path</label>
+                        <input type="text" id="tls_cert_path" name="TLS_CERT_PATH" value="{{.Config.TLS_CERT_PATH}}">
+                    </div>
+                    <div data-form-group>
+                        <label for="tls_key_path">TLS Key Path</label>
+                        <input type="text" id="tls_key_path" name="TLS_KEY_PATH" value="{{.Config.TLS_KEY_PATH}}">
+                    </div>
+                    <div data-form-group>
+                        <label for="allowed_origins">Allowed Origins (comma-separated)</label>
+                        <input type="text" id="allowed_origins" name="ALLOWED_ORIGINS" value="{{.Config.ALLOWED_ORIGINS}}">
+                    </div>
+
+                    <h4>Rate Limiting</h4>
+                    <div data-form-group="checkbox">
+                        <input type="checkbox" id="rate_limit_enabled" name="RATE_LIMIT_ENABLED" {{if eq .Config.RATE_LIMIT_ENABLED "true"}}checked{{end}}>
+                        <label for="rate_limit_enabled">Enable Rate Limiting</label>
+                    </div>
+                    <div data-form-group>
+                        <label for="rate_limit_requests">Max Requests</label>
+                        <input type="number" id="rate_limit_requests" name="RATE_LIMIT_REQUESTS" value="{{.Config.RATE_LIMIT_REQUESTS}}">
+                    </div>
+                    <div data-form-group>
+                        <label for="rate_limit_window">Time Window</label>
+                        <input type="text" id="rate_limit_window" name="RATE_LIMIT_WINDOW" value="{{.Config.RATE_LIMIT_WINDOW}}" placeholder="e.g. 1m">
+                    </div>
+                    <div data-form-group="checkbox">
+                        <input type="checkbox" id="rate_limit_by_ip" name="RATE_LIMIT_BY_IP" {{if eq .Config.RATE_LIMIT_BY_IP "true"}}checked{{end}}>
+                        <label for="rate_limit_by_ip">Rate Limit by IP</label>
+                    </div>
+                    <div data-form-group="checkbox">
+                        <input type="checkbox" id="rate_limit_by_route" name="RATE_LIMIT_BY_ROUTE" {{if eq .Config.RATE_LIMIT_BY_ROUTE "true"}}checked{{end}}>
+                        <label for="rate_limit_by_route">Rate Limit by Route</label>
+                    </div>
+
+                    <h4>CORS Settings</h4>
+                    <div data-form-group="checkbox">
+                        <input type="checkbox" id="cors_enabled" name="CORS_ENABLED" {{if eq .Config.CORS_ENABLED "true"}}checked{{end}}>
+                        <label for="cors_enabled">Enable CORS</label>
+                    </div>
+                    <div data-form-group>
+                        <label for="cors_allowed_origins">Allowed Origins (comma-separated)</label>
+                        <input type="text" id="cors_allowed_origins" name="CORS_ALLOWED_ORIGINS" value="{{.Config.CORS_ALLOWED_ORIGINS}}">
+                    </div>
+                    <div data-form-group>
+                        <label for="cors_allowed_methods">Allowed Methods (comma-separated)</label>
+                        <input type="text" id="cors_allowed_methods" name="CORS_ALLOWED_METHODS" value="{{.Config.CORS_ALLOWED_METHODS}}">
+                    </div>
+                    <div data-form-group>
+                        <label for="cors_allowed_headers">Allowed Headers (comma-separated)</label>
+                        <input type="text" id="cors_allowed_headers" name="CORS_ALLOWED_HEADERS" value="{{.Config.CORS_ALLOWED_HEADERS}}">
+                    </div>
+                    <div data-form-group>
+                        <label for="cors_exposed_headers">Exposed Headers (comma-separated)</label>
+                        <input type="text" id="cors_exposed_headers" name="CORS_EXPOSED_HEADERS" value="{{.Config.CORS_EXPOSED_HEADERS}}">
+                    </div>
+                    <div data-form-group="checkbox">
+                        <input type="checkbox" id="cors_allow_credentials" name="CORS_ALLOW_CREDENTIALS" {{if eq .Config.CORS_ALLOW_CREDENTIALS "true"}}checked{{end}}>
+                        <label for="cors_allow_credentials">Allow Credentials</label>
+                    </div>
+                    <div data-form-group>
+                        <label for="cors_max_age">Max Age (seconds)</label>
+                        <input type="number" id="cors_max_age" name="CORS_MAX_AGE" value="{{.Config.CORS_MAX_AGE}}">
+                    </div>
+
+                    <h4>Security Headers</h4>
+                    <div data-form-group>
+                        <label for="header_xss_protection">XSS Protection</label>
+                        <input type="text" id="header_xss_protection" name="HEADER_XSS_PROTECTION" value="{{.Config.HEADER_XSS_PROTECTION}}">
+                    </div>
+                    <div data-form-group>
+                        <label for="header_content_type_options">Content Type Options</label>
+                        <input type="text" id="header_content_type_options" name="HEADER_CONTENT_TYPE_OPTIONS" value="{{.Config.HEADER_CONTENT_TYPE_OPTIONS}}">
+                    </div>
+                    <div data-form-group>
+                        <label for="header_x_frame_options">X-Frame-Options</label>
+                        <input type="text" id="header_x_frame_options" name="HEADER_X_FRAME_OPTIONS" value="{{.Config.HEADER_X_FRAME_OPTIONS}}">
+                    </div>
+                    <div data-form-group>
+                        <label for="header_content_security_policy">Content Security Policy</label>
+                        <input type="text" id="header_content_security_policy" name="HEADER_CONTENT_SECURITY_POLICY" value="{{.Config.HEADER_CONTENT_SECURITY_POLICY}}">
+                    </div>
+                    <div data-form-group>
+                        <label for="header_referrer_policy">Referrer Policy</label>
+                        <input type="text" id="header_referrer_policy" name="HEADER_REFERRER_POLICY" value="{{.Config.HEADER_REFERRER_POLICY}}">
+                    </div>
+                    <div data-form-group>
+                        <label for="header_strict_transport_security">Strict Transport Security</label>
+                        <input type="text" id="header_strict_transport_security" name="HEADER_STRICT_TRANSPORT_SECURITY" value="{{.Config.HEADER_STRICT_TRANSPORT_SECURITY}}">
+                    </div>
+                    <div data-form-group>
+                        <label for="header_permissions_policy">Permissions Policy</label>
+                        <input type="text" id="header_permissions_policy" name="HEADER_PERMISSIONS_POLICY" value="{{.Config.HEADER_PERMISSIONS_POLICY}}">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Authentication Settings Tab -->
+            <div data-tab-content="auth">
+                <h3 data-text="h3">Authentication Configuration</h3>
+                <div data-grid="2">
+                    <div data-form-group="checkbox">
+                        <input type="checkbox" id="auth_enabled" name="AUTH_ENABLED" {{if eq .Config.AUTH_ENABLED "true"}}checked{{end}}>
+                        <label for="auth_enabled">Enable Authentication</label>
+                    </div>
+                    <div data-form-group>
+                        <label for="auth_username">Username</label>
+                        <input type="text" id="auth_username" name="AUTH_USERNAME" value="{{.Config.AUTH_USERNAME}}">
+                    </div>
+                    <div data-form-group>
+                        <label for="auth_password">Password</label>
+                        <input type="password" id="auth_password" name="AUTH_PASSWORD" value="{{.Config.AUTH_PASSWORD}}">
+                    </div>
+                    <div data-form-group>
+                        <label for="auth_exclude_paths">Excluded Paths (comma-separated)</label>
+                        <input type="text" id="auth_exclude_paths" name="AUTH_EXCLUDE_PATHS" value="{{.Config.AUTH_EXCLUDE_PATHS}}">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Logging Settings Tab -->
+            <div data-tab-content="logging">
+                <h3 data-text="h3">Logging Configuration</h3>
+                <div data-grid="2">
+                    <div data-form-group>
+                        <label for="log_level">Log Level</label>
+                        <select id="log_level" name="LOG_LEVEL">
+                            <option value="debug" {{if eq .Config.LOG_LEVEL "debug"}}selected{{end}}>Debug</option>
+                            <option value="info" {{if eq .Config.LOG_LEVEL "info"}}selected{{end}}>Info</option>
+                            <option value="warn" {{if eq .Config.LOG_LEVEL "warn"}}selected{{end}}>Warning</option>
+                            <option value="error" {{if eq .Config.LOG_LEVEL "error"}}selected{{end}}>Error</option>
+                            <option value="fatal" {{if eq .Config.LOG_LEVEL "fatal"}}selected{{end}}>Fatal</option>
+                        </select>
+                    </div>
+                    <div data-form-group="checkbox">
+                        <input type="checkbox" id="log_use_json" name="LOG_USE_JSON" {{if eq .Config.LOG_USE_JSON "true"}}checked{{end}}>
+                        <label for="log_use_json">JSON Logging</label>
+                    </div>
+                    <div data-form-group="checkbox">
+                        <input type="checkbox" id="log_enable_file" name="LOG_ENABLE_FILE" {{if eq .Config.LOG_ENABLE_FILE "true"}}checked{{end}}>
+                        <label for="log_enable_file">File Logging</label>
+                    </div>
+                    <div data-form-group>
+                        <label for="log_file_path">Log File Path</label>
+                        <input type="text" id="log_file_path" name="LOG_FILE_PATH" value="{{.Config.LOG_FILE_PATH}}">
+                    </div>
+                    <div data-form-group>
+                        <label for="log_rotation_size">Log Rotation Size</label>
+                        <input type="text" id="log_rotation_size" name="LOG_ROTATION_SIZE" value="{{.Config.LOG_ROTATION_SIZE}}" placeholder="e.g. 100MB">
+                    </div>
+                    <div data-form-group>
+                        <label for="log_max_age">Log Max Age</label>
+                        <input type="text" id="log_max_age" name="LOG_MAX_AGE" value="{{.Config.LOG_MAX_AGE}}" placeholder="e.g. 168h">
+                    </div>
+                    <div data-form-group="checkbox">
+                        <input type="checkbox" id="log_compression" name="LOG_COMPRESSION" {{if eq .Config.LOG_COMPRESSION "true"}}checked{{end}}>
+                        <label for="log_compression">Enable Log Compression</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Admin Settings Tab -->
+            <div data-tab-content="admin">
+                <h3 data-text="h3">Admin Configuration</h3>
+                <div data-grid="2">
+                    <div data-form-group="checkbox">
+                        <input type="checkbox" id="admin_enabled" name="ADMIN_ENABLED" {{if eq .Config.ADMIN_ENABLED "true"}}checked{{end}}>
+                        <label for="admin_enabled">Enable Admin Interface</label>
+                    </div>
+                    <div data-form-group>
+                        <label for="admin_path">Admin Path</label>
+                        <input type="text" id="admin_path" name="ADMIN_PATH" value="{{.Config.ADMIN_PATH}}">
+                    </div>
+                    <div data-form-group>
+                        <label for="admin_refresh_interval">Refresh Interval</label>
+                        <input type="text" id="admin_refresh_interval" name="ADMIN_REFRESH_INTERVAL" value="{{.Config.ADMIN_REFRESH_INTERVAL}}" placeholder="e.g. 5s">
+                    </div>
+                    <div data-form-group>
+                        <label for="admin_username">Admin Username</label>
+                        <input type="text" id="admin_username" name="ADMIN_USERNAME" value="{{.Config.ADMIN_USERNAME}}">
+                    </div>
+                    <div data-form-group>
+                        <label for="admin_password">Admin Password</label>
+                        <input type="password" id="admin_password" name="ADMIN_PASSWORD" value="{{.Config.ADMIN_PASSWORD}}">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Advanced Settings Tab -->
+            <div data-tab-content="advanced">
+                <h3 data-text="h3">Advanced Configuration</h3>
+                <div data-grid="2">
+                    <div data-form-group="checkbox">
+                        <input type="checkbox" id="system_api_enabled" name="SYSTEM_API_ENABLED" {{if eq .Config.SYSTEM_API_ENABLED "true"}}checked{{end}}>
+                        <label for="system_api_enabled">Enable System API</label>
+                    </div>
+                    <div data-form-group>
+                        <label for="system_api_prefix">System API Prefix</label>
+                        <input type="text" id="system_api_prefix" name="SYSTEM_API_PREFIX" value="{{.Config.SYSTEM_API_PREFIX}}">
+                    </div>
+                    <div data-form-group="checkbox">
+                        <input type="checkbox" id="metrics_enabled" name="METRICS_ENABLED" {{if eq .Config.METRICS_ENABLED "true"}}checked{{end}}>
+                        <label for="metrics_enabled">Enable Metrics</label>
+                    </div>
+                    <div data-form-group="checkbox">
+                        <input type="checkbox" id="detailed_health_enabled" name="DETAILED_HEALTH_ENABLED" {{if eq .Config.DETAILED_HEALTH_ENABLED "true"}}checked{{end}}>
+                        <label for="detailed_health_enabled">Enable Detailed Health Checks</label>
+                    </div>
+                    <div data-form-group>
+                        <label for="admin_template">Admin Template</label>
+                        <input type="text" id="admin_template" name="ADMIN_TEMPLATE" value="{{.Config.ADMIN_TEMPLATE}}">
+                    </div>
+                    <div data-form-group>
+                        <label for="api_prefix">API Prefix</label>
+                        <input type="text" id="api_prefix" name="API_PREFIX" value="{{.Config.API_PREFIX}}">
+                    </div>
+                    <div data-form-group>
+                        <label for="api_version">API Version</label>
+                        <input type="text" id="api_version" name="API_VERSION" value="{{.Config.API_VERSION}}">
+                    </div>
+                </div>
+            </div>
+
+            <div data-form-actions>
+                <div data-action-info>
+                    <span data-icon>ℹ️</span>
+                    <span data-text="small">Server will restart automatically when settings are saved.</span>
+                </div>
+                <div data-action-buttons>
+                    <button type="button" data-button="secondary" data-button="reset">Reset to Defaults</button>
+                    <button type="submit" data-button="primary">Save Settings</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{{end}} 

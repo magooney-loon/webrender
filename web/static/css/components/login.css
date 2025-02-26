@@ -1,0 +1,104 @@
+/* Login Page Styles */
+
+/* Container */
+[data-layout="container"] {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-xl);
+}
+
+/* Login Card */
+[data-card="login"] {
+    width: 100%;
+    max-width: 400px;
+    padding: var(--space-2xl);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+}
+
+/* Logo */
+[data-logo] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-md);
+    margin-bottom: var(--space-xl);
+}
+
+[data-logo] img {
+    width: 48px;
+    height: 48px;
+}
+
+[data-logo] [data-text="h2"] {
+    font-size: var(--text-2xl);
+    color: var(--text-primary);
+}
+
+/* Login Form */
+[data-form="login"] {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+}
+
+[data-form="login"] [data-text="h1"] {
+    text-align: center;
+    margin-bottom: var(--space-lg);
+    color: var(--text-primary);
+}
+
+[data-form-group] {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+[data-form-group] label {
+    color: var(--text-secondary);
+    font-weight: var(--font-medium);
+}
+
+[data-form-group] input {
+    padding: var(--space-md);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: var(--text-base);
+    transition: var(--transition-base);
+}
+
+[data-form-group] input:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(0, 112, 243, 0.1);
+    outline: none;
+}
+
+[data-button="primary"] {
+    width: 100%;
+    padding: var(--space-md);
+    margin-top: var(--space-md);
+    font-size: var(--text-base);
+    font-weight: var(--font-medium);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 480px) {
+    [data-card="login"] {
+        padding: var(--space-xl);
+    }
+    
+    [data-logo] img {
+        width: 40px;
+        height: 40px;
+    }
+    
+    [data-logo] [data-text="h2"] {
+        font-size: var(--text-xl);
+    }
+} 

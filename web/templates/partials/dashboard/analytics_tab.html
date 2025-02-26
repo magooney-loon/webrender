@@ -1,0 +1,76 @@
+{{define "analytics_tab"}}
+<div data-grid="3">
+    <div data-card>
+        <h3 data-text="h3">Visitor Analytics</h3>
+        {{if .AnalyticsStats.TotalVisitors}}
+        <table data-metrics-table>
+            <tbody>
+                <tr><td>Total Visitors</td><td>{{.AnalyticsStats.TotalVisitors}}</td></tr>
+                <tr><td>Unique Visitors</td><td>{{.AnalyticsStats.UniqueVisitors}}</td></tr>
+                <tr><td>Visitors Today</td><td>{{.AnalyticsStats.VisitorsToday}}</td></tr>
+                <tr><td>Avg Session</td><td>{{printf "%.2f" .AnalyticsStats.AvgSessionDuration}} sec</td></tr>
+                <tr><td>Bounce Rate</td><td>{{printf "%.2f" .AnalyticsStats.BounceRate}}%</td></tr>
+                <tr><td>New Visitors</td><td>{{.AnalyticsStats.NewVsReturningVisitors.New}}</td></tr>
+                <tr><td>Returning Visitors</td><td>{{.AnalyticsStats.NewVsReturningVisitors.Returning}}</td></tr>
+            </tbody>
+        </table>
+        {{else}}
+        <div data-empty>
+            <p data-text="body">No visitor data available</p>
+        </div>
+        {{end}}
+    </div>
+
+    <div data-card>
+        <h3 data-text="h3">Top Pages</h3>
+        {{if .AnalyticsStats.TopPages}}
+        <table data-metrics-table>
+            <thead>
+                <tr>
+                    <th>Page</th>
+                    <th>Views</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range $page, $views := .AnalyticsStats.TopPages}}
+                <tr>
+                    <td data-cell="path" title="{{$page}}">{{$page}}</td>
+                    <td>{{$views}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+        {{else}}
+        <div data-empty>
+            <p data-text="body">No page view data available</p>
+        </div>
+        {{end}}
+    </div>
+
+    <div data-card>
+        <h3 data-text="h3">Top Referrers</h3>
+        {{if .AnalyticsStats.TopReferrers}}
+        <table data-metrics-table>
+            <thead>
+                <tr>
+                    <th>Referrer</th>
+                    <th>Count</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range $ref, $count := .AnalyticsStats.TopReferrers}}
+                <tr>
+                    <td data-cell="path" title="{{$ref}}">{{$ref}}</td>
+                    <td>{{$count}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+        {{else}}
+        <div data-empty>
+            <p data-text="body">No referrer data available</p>
+        </div>
+        {{end}}
+    </div>
+</div>
+{{end}} 

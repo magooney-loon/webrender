@@ -1,0 +1,32 @@
+/* Dark Theme - Default */
+:root[data-theme="dark"] {
+  /* Background Colors */
+  --bg-primary: var(--color-black);
+  --bg-secondary: #111;
+  --bg-tertiary: #1a1a1a;
+  
+  /* Text Colors */
+  --text-primary: var(--color-white);
+  --text-secondary: rgba(255, 255, 255, 0.7);
+  --text-muted: rgba(255, 255, 255, 0.5);
+  
+  /* Border Colors */
+  --border-color: rgba(255, 255, 255, 0.1);
+  
+  /* Accent Colors */
+  --accent-color: var(--color-blue);
+  --success-color: var(--color-blue);
+  --warning-color: var(--color-yellow);
+  --error-color: var(--color-red);
+  
+  /* Component Colors */
+  --card-bg: var(--bg-secondary);
+  --input-bg: var(--bg-tertiary);
+  --button-bg: var(--bg-tertiary);
+  --overlay-bg: rgba(0, 0, 0, 0.7);
+}
+
+/* Default to dark theme */
+:root {
+  color-scheme: dark;
+} 

@@ -1,0 +1,121 @@
+/* Dashboard Specific Components */
+@import 'dash_tabs.css';
+@import 'overview.css';
+
+/* Dashboard Header */
+[data-header] {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-xl);
+  padding: var(--space-lg);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+[data-header-left] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+[data-header-right] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xl);
+}
+
+/* Welcome Component */
+[data-welcome] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+[data-welcome-icon] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--bg-secondary);
+  border-radius: 50%;
+  color: var(--accent-color);
+}
+
+[data-welcome-content] [data-text="welcome"] {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+[data-welcome-content] [data-text="emphasis"] {
+  color: var(--text-primary);
+  font-weight: var(--font-medium);
+}
+
+/* Dashboard Layout */
+[data-metrics-table] {
+    width: 100%;
+    border-collapse: collapse;
+    margin: var(--space-md) 0;
+}
+
+[data-metrics-table] th,
+[data-metrics-table] td {
+    padding: var(--space-sm) var(--space-md);
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+[data-metrics-table] th {
+    font-weight: var(--font-semibold);
+    color: var(--text-secondary);
+    background: var(--surface-2);
+    white-space: nowrap;
+}
+
+[data-metrics-table] td {
+    color: var(--text-primary);
+}
+
+[data-metrics-table] tr:last-child td {
+    border-bottom: none;
+}
+
+[data-metrics-table] [data-cell="path"] {
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Make sure table headers align with body cells */
+[data-metrics-table] thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    min-width: 120px; /* Minimum width for columns */
+}
+
+[data-metrics-table] tbody td {
+    min-width: 120px; /* Match header minimum width */
+}
+
+/* First column can be wider for paths */
+[data-metrics-table] th:first-child,
+[data-metrics-table] td:first-child {
+    min-width: 200px;
+}
+
+/* Last column for actions/status */
+[data-metrics-table] th:last-child,
+[data-metrics-table] td:last-child {
+    min-width: 150px;
+    text-align: right;
+}
+
