@@ -14,6 +14,9 @@ import (
 	"github.com/magooney-loon/webserver/pkg/logger"
 )
 
+// /api/v1/user/cached?id=1
+// /api/v1/user?id=1
+
 // User represents a user in the database
 type User struct {
 	ID        int64     `json:"id"`
@@ -79,6 +82,138 @@ func userHandler(w http.ResponseWriter, r *http.Request) {
 	// Return the user
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(user)
+}
+
+// Handler that demonstrates database access with caching
+func cachedUserHandler(w http.ResponseWriter, r *http.Request) {
+	// Get the logger from config since we're not using request context yet
+	_, log := config.LoadWithOptions()
+
+	// Get database instance
+	db, err := database.GetInstance()
+	if err != nil {
+		log.Error("failed to get database instance", map[string]interface{}{
+			"error": err.Error(),
+		})
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	// Get user ID from request (simplified, would normally use path params)
+	userID := r.URL.Query().Get("id")
+	if userID == "" {
+		userID = "1" // Default to first user if not specified
+	}
+
+	log.Info("looking up user with caching", map[string]interface{}{
+		"user_id": userID,
+	})
+
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	// Record time to measure performance
+	startTime := time.Now()
+
+	// First, get cache stats before the query
+	cacheStatsBefore := db.GetCacheStats()
+
+	// Query the database with caching
+	row := db.QueryRowCached(ctx, "SELECT id, username, email, created_at FROM users WHERE id = ?", userID)
+
+	// Parse the result
+	var user User
+	if err := row.Scan(&user.ID, &user.Username, &user.Email, &user.CreatedAt); err != nil {
+		log.Error("database query failed", map[string]interface{}{
+			"error":   err.Error(),
+			"user_id": userID,
+		})
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	// Get cache statistics after the query
+	cacheStatsAfter := db.GetCacheStats()
+
+	// Calculate query duration
+	queryDuration := time.Since(startTime)
+
+	// Determine if this was a cache hit
+	wasHit := cacheStatsAfter.Hits > cacheStatsBefore.Hits
+
+	log.Info("user found (cached query)", map[string]interface{}{
+		"user_id":       user.ID,
+		"username":      user.Username,
+		"email":         user.Email,
+		"duration_ms":   queryDuration.Milliseconds(),
+		"was_cache_hit": wasHit,
+		"cache_hits":    cacheStatsAfter.Hits,
+		"cache_misses":  cacheStatsAfter.Misses,
+	})
+
+	// Create response with user data and cache stats
+	response := struct {
+		User           User    `json:"user"`
+		QueryTimeMs    int64   `json:"query_time_ms"`
+		WasCacheHit    bool    `json:"was_cache_hit"`
+		CacheHits      uint64  `json:"cache_hits"`
+		CacheMisses    uint64  `json:"cache_misses"`
+		CacheHitRate   float64 `json:"cache_hit_rate"`
+		CacheItemCount int     `json:"cache_item_count"`
+	}{
+		User:           user,
+		QueryTimeMs:    queryDuration.Milliseconds(),
+		WasCacheHit:    wasHit,
+		CacheHits:      cacheStatsAfter.Hits,
+		CacheMisses:    cacheStatsAfter.Misses,
+		CacheHitRate:   cacheStatsAfter.HitRatio,
+		CacheItemCount: cacheStatsAfter.Items,
+	}
+
+	// Return the enhanced response
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// Handler to clear the cache
+func clearCacheHandler(w http.ResponseWriter, r *http.Request) {
+	_, log := config.LoadWithOptions()
+
+	// Get database instance
+	db, err := database.GetInstance()
+	if err != nil {
+		log.Error("failed to get database instance", map[string]interface{}{
+			"error": err.Error(),
+		})
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	// Get cache stats before clearing
+	statsBefore := db.GetCacheStats()
+
+	// Clear the cache
+	db.ClearCache()
+
+	// Get cache stats after clearing
+	statsAfter := db.GetCacheStats()
+
+	log.Info("cache cleared", map[string]interface{}{
+		"items_before": statsBefore.Items,
+		"items_after":  statsAfter.Items,
+	})
+
+	// Return success response
+	response := map[string]interface{}{
+		"success":      true,
+		"items_before": statsBefore.Items,
+		"items_after":  statsAfter.Items,
+		"message":      "Cache cleared successfully",
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
 // Custom middleware example that adds a header
@@ -158,11 +293,13 @@ func main() {
 		config.WithAuthCredentials("admin", "secretpass"),
 	)
 
-	// Initialize the database
+	// Initialize the database with caching enabled
 	log.Info("initializing database", map[string]interface{}{
-		"path":      "./data/app.db",
-		"pool_size": 5,
-		"wal_mode":  true,
+		"path":          "./data/app.db",
+		"pool_size":     5,
+		"wal_mode":      true,
+		"cache_enabled": true,
+		"cache_ttl":     "5m",
 	})
 
 	dbConfig := database.DefaultConfig()
@@ -170,6 +307,11 @@ func main() {
 	dbConfig.PoolSize = 5
 	dbConfig.WALMode = true
 	dbConfig.AutoMigrate = false // Disable auto-migrations to prevent transaction conflicts
+
+	// Enable query caching
+	dbConfig.CacheEnabled = true
+	dbConfig.CacheTTL = 5 * time.Minute
+	dbConfig.CacheMaxItems = 1000
 
 	if err := database.Initialize(dbConfig); err != nil {
 		log.Fatal("database initialization failed", map[string]interface{}{
@@ -212,6 +354,18 @@ func main() {
 				Method:      http.MethodGet,
 				Handler:     userHandler,
 				Description: "Get user by ID",
+			},
+			{
+				Path:        "/user/cached",
+				Method:      http.MethodGet,
+				Handler:     cachedUserHandler,
+				Description: "Get user by ID (with caching)",
+			},
+			{
+				Path:        "/cache/clear",
+				Method:      http.MethodPost,
+				Handler:     clearCacheHandler,
+				Description: "Clear the query cache",
 			},
 			{
 				Path:    "/secure",

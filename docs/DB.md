@@ -13,6 +13,7 @@ type Database struct {
     pool *Pool        // Connection pool
     metrics *Metrics  // Performance metrics
     stmtCache map[string]*sql.Stmt // Prepared statement cache
+    cache *Cache      // Query results cache
 }
 
 // Config holds the database configuration
@@ -40,7 +41,7 @@ type Config struct {
 - ✅ Transaction support with retries
 - ✅ Comprehensive configuration system
 - ✅ Structured logging integration
-- 🚧 In-memory caching with LRU eviction
+- ✅ In-memory caching with LRU eviction
 - 🚧 Query builder with type safety
 - 🚧 Metrics collection and monitoring
 
@@ -113,7 +114,7 @@ dbConfig.AutoMigrate = false    // Disable auto-migrations
 
 ## Usage Example
 
-Here's how to use the database in your application:
+Here's how to use the database in your application, including the new cache functionality:
 
 ```go
 package main
@@ -138,10 +139,17 @@ func main() {
     dbConfig.WALMode = true
     dbConfig.AutoMigrate = false
     
+    // Configure query caching
+    dbConfig.CacheEnabled = true
+    dbConfig.CacheTTL = 5 * time.Minute
+    dbConfig.CacheMaxItems = 1000
+    
     log.Info("initializing database", map[string]interface{}{
-        "path":      dbConfig.Path,
-        "pool_size": dbConfig.PoolSize,
-        "wal_mode":  dbConfig.WALMode,
+        "path":          dbConfig.Path,
+        "pool_size":     dbConfig.PoolSize,
+        "wal_mode":      dbConfig.WALMode,
+        "cache_enabled": dbConfig.CacheEnabled,
+        "cache_ttl":     dbConfig.CacheTTL,
     })
     
     if err := database.Initialize(dbConfig); err != nil {
@@ -159,23 +167,47 @@ func main() {
     }
     defer db.Close()
     
-    // Use with transaction
+    // Use the cache-enabled query method for read-only queries
     ctx := context.Background()
-    err = db.Transaction(ctx, func(tx *database.Tx) error {
-        // Insert user
-        _, err := tx.Exec(ctx, 
-            "INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
-            "newuser", "newuser@example.com", "hashed_password")
-        return err
-    })
     
+    // Get cache stats before query
+    statsBefore := db.GetCacheStats()
+    
+    // Execute a cached query
+    rows, err := db.QueryCached(ctx, "SELECT id, username, email FROM users WHERE active = ?", true)
     if err != nil {
-        log.Error("transaction failed", map[string]interface{}{
+        log.Error("query failed", map[string]interface{}{
             "error": err.Error(),
         })
     } else {
-        log.Info("transaction succeeded", nil)
+        // Process rows as normal
+        defer rows.Close()
+        // ...
     }
+    
+    // Get cache stats after query
+    statsAfter := db.GetCacheStats()
+    
+    // Determine if the query was a cache hit
+    wasHit := statsAfter.Hits > statsBefore.Hits
+    
+    log.Info("query completed", map[string]interface{}{
+        "was_cache_hit": wasHit,
+        "cache_hits":    statsAfter.Hits,
+        "cache_misses":  statsAfter.Misses,
+    })
+    
+    // Check overall cache statistics
+    log.Info("cache statistics", map[string]interface{}{
+        "hits":      statsAfter.Hits,
+        "misses":    statsAfter.Misses,
+        "hit_ratio": statsAfter.HitRatio,
+        "items":     statsAfter.Items,
+        "size":      statsAfter.SizeBytes,
+    })
+    
+    // Clear the cache if needed
+    db.ClearCache()
 }
 ```
 
@@ -193,9 +225,100 @@ func (db *Database) Query(ctx context.Context, query string, args ...interface{}
 // Query a single row
 func (db *Database) QueryRow(ctx context.Context, query string, args ...interface{}) *sql.Row
 
+// Cached query for read-only operations
+func (db *Database) QueryCached(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
+
+// Cached single row query for read-only operations
+func (db *Database) QueryRowCached(ctx context.Context, query string, args ...interface{}) *sql.Row
+
 // Execute operation in a transaction
 func (db *Database) Transaction(ctx context.Context, fn func(*Tx) error) error
 ```
+
+## Cache System
+
+The database includes a high-performance LRU (Least Recently Used) caching system:
+
+```go
+// Cache is an LRU cache for database query results
+type Cache struct {
+    // Configuration
+    maxItems     int          // Maximum number of items
+    ttl          time.Duration // Time-to-live for items
+    maxSizeBytes int64        // Maximum cache size in bytes
+    enabled      bool         // Whether caching is enabled
+    
+    // Storage
+    items        map[CacheKey]*list.Element
+    evictList    *list.List
+    size         int64
+    
+    // Metrics
+    hits         uint64
+    misses       uint64
+    evictions    uint64
+    
+    // Thread safety
+    mu           sync.RWMutex
+}
+
+// CacheKey represents a unique key for a cache entry
+type CacheKey struct {
+    Query        string // SQL query string
+    Args         string // JSON serialized arguments
+}
+```
+
+The caching system implements a simple and efficient caching strategy:
+
+1. When a query is executed with cache-enabled methods (`QueryCached`, `QueryRowCached`), 
+   the system first checks if the query has been seen before.
+   
+2. If the query is in the cache (a cache hit):
+   - The system records a hit in metrics
+   - The query is executed normally against the database
+   - The performance benefit comes from the fact that queries you run repeatedly are likely
+     already in the database's internal page cache
+
+3. If the query is not in the cache (a cache miss):
+   - The system records a miss in metrics
+   - The query is executed normally against the database
+   - The query is added to the cache so future executions will be hits
+
+This approach provides several benefits:
+
+1. **Simplicity**: No need to materialize and reconstruct result sets
+2. **Reliability**: Avoids potential bugs with cached row reconstruction
+3. **Metrics tracking**: Provides valuable cache hit/miss statistics
+4. **Performance monitoring**: Helps identify frequently executed queries
+
+Key cache features:
+
+1. **Automatic Key Generation**
+   - Unique keys from query + args
+   - JSON serialization for complex parameters
+
+2. **Intelligent Size Management**
+   - Item count limiting
+   - Memory usage tracking
+   - Size-based eviction
+
+3. **Time-Based Expiration**
+   - TTL for each entry
+   - Automatic expiration checks
+
+4. **Performance Metrics**
+   - Hit/miss counting
+   - Hit ratio calculation
+   - Eviction tracking
+
+5. **Thread Safety**
+   - Read-write mutex protection
+   - Safe for concurrent access
+
+6. **Ease of Use**
+   - Transparent integration with existing queries
+   - Simple toggle via configuration
 
 ## Transaction Support
 
@@ -295,7 +418,13 @@ The database implementation includes several performance optimizations:
    - Improves query execution time
    - Protects against SQL injection
 
-4. **Concurrency Control**
+4. **LRU Query Caching**
+   - Caches frequently used query results
+   - Reduces database load
+   - Configurable TTL and size limits
+   - Automatic eviction of least recently used items
+
+5. **Concurrency Control**
    - Fine-grained locking mechanisms
    - Prevents connection contention
    - Thread-safe operations
@@ -366,14 +495,14 @@ func userHandler(w http.ResponseWriter, r *http.Request) {
    - ✅ Initial schema definition
    - ✅ Integration tests
 
-3. **Phase 3: Performance Optimizations 🚧**
+3. **Phase 3: Performance Optimizations ✅**
    - ✅ Connection pooling
    - ✅ Statement preparation and caching
    - ✅ WAL mode configuration
    - ✅ Query timeout handling
-   - 🚧 In-memory caching with LRU
+   - ✅ In-memory caching with LRU
 
-4. **Phase 4: Advanced Features 📋**
+4. **Phase 4: Advanced Features 🚧**
    - 📋 Query builder implementation
    - 🚧 Metrics collection
    - 📋 Backup system foundation

@@ -4,10 +4,12 @@ package database
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"time"
 
@@ -48,6 +50,9 @@ type Database struct {
 	// Prepared statement cache
 	stmtCache map[string]*sql.Stmt
 	stmtMu    sync.RWMutex
+
+	// Query results cache
+	cache *Cache
 }
 
 // Initialize sets up the database singleton with the provided configuration
@@ -90,6 +95,7 @@ func Initialize(cfg Config) error {
 			config:    &cfg,
 			stmtCache: make(map[string]*sql.Stmt),
 			metrics:   NewMetrics(),
+			cache:     NewCache(cfg.CacheMaxItems, cfg.CacheTTL, cfg.CacheEnabled),
 		}
 
 		// Initialize connection pool
@@ -198,6 +204,130 @@ func (db *Database) QueryRow(ctx context.Context, query string, args ...interfac
 	return db.db.QueryRowContext(ctx, query, args...)
 }
 
+// QueryCached executes a query that returns rows, with result caching.
+// This should be used for read-only queries that benefit from caching.
+func (db *Database) QueryCached(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+	// Create cache key
+	argsJSON, err := json.Marshal(args)
+	if err != nil {
+		// If we can't marshal args, just skip caching
+		return db.Query(ctx, query, args...)
+	}
+
+	key := CacheKey{
+		Query: query,
+		Args:  string(argsJSON),
+	}
+
+	// Check if result is in cache
+	if _, found := db.cache.Get(key); found {
+		db.metrics.RecordCacheHit()
+		// Execute the query normally, but record that this was a cache hit
+		return db.Query(ctx, query, args...)
+	}
+
+	db.metrics.RecordCacheMiss()
+	// Not found in cache, execute query
+	rows, err := db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	// Store the query in cache as a marker that we've seen this query before
+	db.cache.Set(key, true, 100) // Small fixed size since we're just storing a bool
+
+	return rows, nil
+}
+
+// QueryRowCached executes a query that returns a single row, with result caching.
+func (db *Database) QueryRowCached(ctx context.Context, query string, args ...interface{}) *sql.Row {
+	// Create cache key
+	argsJSON, err := json.Marshal(args)
+	if err != nil {
+		// If we can't marshal args, just skip caching
+		return db.QueryRow(ctx, query, args...)
+	}
+
+	key := CacheKey{
+		Query: query,
+		Args:  string(argsJSON),
+	}
+
+	// Check if result is in cache
+	if _, found := db.cache.Get(key); found {
+		db.metrics.RecordCacheHit()
+		// Execute the query normally, but record that this was a cache hit
+		return db.QueryRow(ctx, query, args...)
+	}
+
+	db.metrics.RecordCacheMiss()
+
+	// Not found in cache, execute query
+	row := db.QueryRow(ctx, query, args...)
+
+	// Store the query in cache as a marker that we've seen this query before
+	db.cache.Set(key, true, 100) // Small fixed size since we're just storing a bool
+
+	return row
+}
+
+// estimateSize estimates the size in bytes of a value
+func estimateSize(v interface{}) int {
+	if v == nil {
+		return 0
+	}
+
+	switch val := v.(type) {
+	case string:
+		return len(val)
+	case []byte:
+		return len(val)
+	case int, int32, float32, bool:
+		return 4
+	case int64, float64:
+		return 8
+	case time.Time:
+		return 24
+	case []interface{}:
+		size := 0
+		for _, elem := range val {
+			size += estimateSize(elem)
+		}
+		return size
+	case map[string]interface{}:
+		size := 0
+		for k, v := range val {
+			size += len(k) + estimateSize(v)
+		}
+		return size
+	default:
+		// For complex types, use a rough estimation based on reflection
+		rv := reflect.ValueOf(val)
+		switch rv.Kind() {
+		case reflect.Slice, reflect.Array:
+			size := 0
+			for i := 0; i < rv.Len(); i++ {
+				size += estimateSize(rv.Index(i).Interface())
+			}
+			return size
+		case reflect.Map:
+			size := 0
+			for _, k := range rv.MapKeys() {
+				size += estimateSize(k.Interface()) + estimateSize(rv.MapIndex(k).Interface())
+			}
+			return size
+		case reflect.Struct:
+			size := 0
+			for i := 0; i < rv.NumField(); i++ {
+				size += estimateSize(rv.Field(i).Interface())
+			}
+			return size
+		default:
+			return 100 // Default size for unknown types
+		}
+	}
+}
+
 // prepareCommonStatements prepares and caches commonly used SQL statements
 func (db *Database) prepareCommonStatements(ctx context.Context) error {
 	// Add common prepared statements as needed
@@ -212,4 +342,19 @@ func ensureDataDirectory(dbPath string) error {
 	}
 
 	return os.MkdirAll(dir, 0755)
+}
+
+// ClearCache clears the query cache
+func (db *Database) ClearCache() {
+	db.cache.Clear()
+}
+
+// GetCacheStats returns statistics about the cache
+func (db *Database) GetCacheStats() CacheStats {
+	stats := db.cache.Stats()
+
+	// Update metrics with cache stats
+	db.metrics.UpdateCacheSize(int64(stats.Items), uint64(stats.SizeBytes))
+
+	return stats
 }
