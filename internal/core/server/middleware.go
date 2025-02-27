@@ -109,7 +109,6 @@ func shouldExcludeFromAnalytics(path string) bool {
 		"/static/",
 		"/api/",
 		"/system/health", // Only exclude health check endpoint, not admin dashboard
-		"/favicon.ico",
 	}
 
 	for _, prefix := range prefixes {
