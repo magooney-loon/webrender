@@ -8,7 +8,12 @@ class SettingsManager {
 
             this.resetBtn = document.querySelector('[data-button="reset"]');
             this.submitBtn = document.querySelector('[data-button="primary"]');
+            this.restartDialog = document.querySelector('[data-restart-dialog]');
+            this.statusMessage = document.querySelector('[data-status-message]');
             this.tabManager = null;
+            
+            // Dialog ID
+            this.restartDialogId = 'restart-dialog';
             
             this.init();
         });
@@ -18,6 +23,61 @@ class SettingsManager {
         this.setupTabs();
         this.setupFormSubmission();
         this.setupResetButton();
+        this.registerDialogs();
+    }
+    
+    registerDialogs() {
+        // Check if restart dialog exists in DOM
+        if (!this.restartDialog) {
+            // Create the dialog if it doesn't exist yet
+            this.createRestartDialog();
+        }
+        
+        // Register restart dialog with dialog manager
+        window.dialogs.register('[data-restart-dialog]', {
+            id: this.restartDialogId,
+            stateKey: 'restartDialogOpen',
+            persist: true,
+            closeOnEscape: false,  // Prevent closing during restart
+            closeOnOutsideClick: false, // Prevent closing during restart
+            onOpen: null,
+            onClose: null
+        });
+    }
+    
+    createRestartDialog() {
+        // Create the dialog element if it doesn't exist in the HTML
+        const overlay = document.createElement('div');
+        overlay.setAttribute('data-restart-dialog', '');
+        
+        const dialog = document.createElement('div');
+        dialog.setAttribute('data-dialog', 'restart');
+        
+        const title = document.createElement('h3');
+        title.setAttribute('data-text', 'h3');
+        title.textContent = 'Server Restarting';
+        
+        const message = document.createElement('p');
+        message.setAttribute('data-text', 'body');
+        message.textContent = 'The server is restarting with your new configuration.';
+        
+        const loadingIndicator = document.createElement('div');
+        loadingIndicator.setAttribute('data-loading', '');
+        
+        const statusMessage = document.createElement('p');
+        statusMessage.setAttribute('data-text', 'body');
+        statusMessage.setAttribute('data-status-message', '');
+        statusMessage.textContent = 'Waiting for server to come back online...';
+        this.statusMessage = statusMessage;
+        
+        dialog.appendChild(title);
+        dialog.appendChild(message);
+        dialog.appendChild(loadingIndicator);
+        dialog.appendChild(statusMessage);
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+        
+        this.restartDialog = overlay;
     }
 
     setupTabs() {
@@ -45,7 +105,7 @@ class SettingsManager {
                 });
                 
                 if (response.ok) {
-                    // Show success message
+                    // Show restart dialog
                     this.showRestartOverlay();
                     
                     // Poll server until it's back online
@@ -88,34 +148,19 @@ class SettingsManager {
     }
 
     showRestartOverlay() {
-        const overlay = document.createElement('div');
-        overlay.setAttribute('data-overlay', 'restart');
+        // Make sure dialog exists
+        if (!this.restartDialog) {
+            this.createRestartDialog();
+            this.registerDialogs();
+        }
         
-        const dialog = document.createElement('div');
-        dialog.setAttribute('data-dialog', 'restart');
+        // Reset status message
+        if (this.statusMessage) {
+            this.statusMessage.textContent = 'Waiting for server to come back online...';
+        }
         
-        const title = document.createElement('h3');
-        title.setAttribute('data-text', 'h3');
-        title.textContent = 'Server Restarting';
-        
-        const message = document.createElement('p');
-        message.setAttribute('data-text', 'body');
-        message.textContent = 'The server is restarting with your new configuration.';
-        
-        const loadingIndicator = document.createElement('div');
-        loadingIndicator.setAttribute('data-loading', '');
-        
-        const statusMessage = document.createElement('p');
-        statusMessage.setAttribute('data-text', 'body');
-        statusMessage.setAttribute('data-status-message', '');
-        statusMessage.textContent = 'Waiting for server to come back online...';
-        
-        dialog.appendChild(title);
-        dialog.appendChild(message);
-        dialog.appendChild(loadingIndicator);
-        dialog.appendChild(statusMessage);
-        overlay.appendChild(dialog);
-        document.body.appendChild(overlay);
+        // Open restart dialog
+        window.dialogs.open(this.restartDialogId);
     }
 
     showError(message) {
@@ -148,9 +193,10 @@ class SettingsManager {
             }).then(response => {
                 if (response.ok) {
                     clearInterval(checkInterval);
-                    const statusMessage = document.querySelector('[data-status-message]');
-                    if (statusMessage) {
-                        statusMessage.textContent = 'Server is back online!';
+                    
+                    // Update status message
+                    if (this.statusMessage) {
+                        this.statusMessage.textContent = 'Server is back online!';
                     }
                     
                     // Redirect after a short delay
@@ -161,16 +207,19 @@ class SettingsManager {
             }).catch(() => {
                 if (attempts >= maxAttempts) {
                     clearInterval(checkInterval);
-                    const statusMessage = document.querySelector('[data-status-message]');
-                    if (statusMessage) {
-                        statusMessage.textContent = 'Server restart taking longer than expected. Please refresh manually.';
+                    
+                    // Update status message
+                    if (this.statusMessage) {
+                        this.statusMessage.textContent = 'Server restart taking longer than expected. Please refresh manually.';
                     }
                     
-                    const dialog = document.querySelector('[data-dialog="restart"]');
-                    if (dialog) {
+                    // Add refresh button to dialog
+                    const dialog = this.restartDialog?.querySelector('[data-dialog="restart"]');
+                    if (dialog && !dialog.querySelector('[data-button="refresh"]')) {
                         const refreshButton = document.createElement('button');
                         refreshButton.textContent = 'Refresh Now';
                         refreshButton.setAttribute('data-button', 'primary');
+                        refreshButton.setAttribute('data-button', 'refresh');
                         refreshButton.addEventListener('click', () => {
                             window.location.reload();
                         });

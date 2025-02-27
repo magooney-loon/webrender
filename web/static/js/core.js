@@ -143,6 +143,301 @@ class StateManager {
 }
 
 /**
+ * @typedef {Object} DialogOptions
+ * @property {string} id - Unique dialog identifier
+ * @property {string} stateKey - State key for persistence (defaults to `dialog_${id}`)
+ * @property {boolean} [persist=true] - Whether to persist dialog state
+ * @property {boolean} [closeOnEscape=true] - Close dialog on escape key
+ * @property {boolean} [closeOnOutsideClick=true] - Close dialog when clicking outside
+ * @property {function} [onOpen] - Callback when dialog opens
+ * @property {function} [onClose] - Callback when dialog closes
+ * @property {boolean} [restoreOnLoad=true] - Restore open state on page load
+ */
+
+/**
+ * Dialog system manager
+ * @class
+ */
+class DialogManager {
+    /**
+     * Create a dialog manager
+     */
+    constructor() {
+        /** @type {Object.<string, HTMLElement>} */
+        this.dialogs = {};
+        
+        /** @type {Object.<string, DialogOptions>} */
+        this.options = {};
+        
+        /** @type {Object.<string, function>} */
+        this.escapeHandlers = {};
+        
+        /** @type {Object.<string, function>} */
+        this.outsideClickHandlers = {};
+        
+        /** @type {Set<string>} */
+        this.activeDialogs = new Set();
+        
+        /** @type {string} */
+        this.STATE_KEY_PREFIX = 'dialog_';
+        
+        // Bind event handlers
+        this._handleKeyDown = this._handleKeyDown.bind(this);
+        this._handleBeforeUnload = this._handleBeforeUnload.bind(this);
+        
+        // Add global event listeners
+        document.addEventListener('keydown', this._handleKeyDown);
+        window.addEventListener('beforeunload', this._handleBeforeUnload);
+        
+        // Restore dialogs on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            this._restoreDialogs();
+        });
+    }
+    
+    /**
+     * Register a dialog with the manager
+     * @param {string} selector - CSS selector for the dialog element
+     * @param {DialogOptions} options - Dialog options
+     * @returns {boolean} - Whether registration was successful
+     */
+    register(selector, options) {
+        const element = document.querySelector(selector);
+        if (!element) {
+            console.error(`Dialog element not found: ${selector}`);
+            return false;
+        }
+        
+        const id = options.id || element.id || `dialog-${Object.keys(this.dialogs).length}`;
+        const stateKey = options.stateKey || `${this.STATE_KEY_PREFIX}${id}`;
+        
+        // Default options
+        const dialogOptions = {
+            id,
+            stateKey,
+            persist: options.persist !== false,
+            closeOnEscape: options.closeOnEscape !== false,
+            closeOnOutsideClick: options.closeOnOutsideClick !== false,
+            onOpen: options.onOpen || null,
+            onClose: options.onClose || null,
+            restoreOnLoad: options.restoreOnLoad !== false
+        };
+        
+        // Store dialog and options
+        this.dialogs[id] = element;
+        this.options[id] = dialogOptions;
+        
+        // Set up outside click handler if enabled
+        if (dialogOptions.closeOnOutsideClick) {
+            this.outsideClickHandlers[id] = (event) => {
+                if (event.target === element) {
+                    this.close(id);
+                }
+            };
+            element.addEventListener('click', this.outsideClickHandlers[id]);
+        }
+        
+        // Subscribe to state changes for this dialog
+        window.state.subscribe(stateKey, (event) => {
+            if (event.value && !this.isOpen(id)) {
+                this._openDialog(id, false);
+            } else if (!event.value && this.isOpen(id)) {
+                this._closeDialog(id, false);
+            }
+        });
+        
+        return true;
+    }
+    
+    /**
+     * Open a registered dialog
+     * @param {string} id - Dialog ID
+     */
+    open(id) {
+        if (!this.dialogs[id]) {
+            console.error(`Dialog not registered: ${id}`);
+            return;
+        }
+        
+        this._openDialog(id, true);
+    }
+    
+    /**
+     * Close a registered dialog
+     * @param {string} id - Dialog ID
+     */
+    close(id) {
+        if (!this.dialogs[id]) {
+            console.error(`Dialog not registered: ${id}`);
+            return;
+        }
+        
+        this._closeDialog(id, true);
+    }
+    
+    /**
+     * Check if a dialog is currently open
+     * @param {string} id - Dialog ID
+     * @returns {boolean}
+     */
+    isOpen(id) {
+        if (!this.dialogs[id]) {
+            return false;
+        }
+        
+        return this.activeDialogs.has(id) || 
+            this.dialogs[id].getAttribute('data-active') === 'true';
+    }
+    
+    /**
+     * Toggle a dialog's open state
+     * @param {string} id - Dialog ID
+     */
+    toggle(id) {
+        if (this.isOpen(id)) {
+            this.close(id);
+        } else {
+            this.open(id);
+        }
+    }
+    
+    /**
+     * Internal method to open a dialog
+     * @private
+     * @param {string} id - Dialog ID
+     * @param {boolean} updateState - Whether to update state
+     */
+    _openDialog(id, updateState = true) {
+        const dialog = this.dialogs[id];
+        const options = this.options[id];
+        
+        // Mark as active
+        dialog.setAttribute('data-active', 'true');
+        this.activeDialogs.add(id);
+        
+        // Add no-scroll to body
+        document.body.classList.add('no-scroll');
+        
+        // Update state if requested
+        if (updateState && options.persist) {
+            window.state.set(options.stateKey, true, true);
+        }
+        
+        // Call onOpen callback if provided
+        if (typeof options.onOpen === 'function') {
+            options.onOpen(dialog);
+        }
+    }
+    
+    /**
+     * Internal method to close a dialog
+     * @private
+     * @param {string} id - Dialog ID
+     * @param {boolean} updateState - Whether to update state
+     */
+    _closeDialog(id, updateState = true) {
+        const dialog = this.dialogs[id];
+        const options = this.options[id];
+        
+        // Mark as inactive
+        dialog.setAttribute('data-active', 'false');
+        this.activeDialogs.delete(id);
+        
+        // Remove no-scroll from body if no other dialogs are open
+        if (this.activeDialogs.size === 0) {
+            document.body.classList.remove('no-scroll');
+        }
+        
+        // Update state if requested
+        if (updateState && options.persist) {
+            window.state.set(options.stateKey, false, true);
+        }
+        
+        // Call onClose callback if provided
+        if (typeof options.onClose === 'function') {
+            options.onClose(dialog);
+        }
+    }
+    
+    /**
+     * Handle keydown events for escape key
+     * @private
+     * @param {KeyboardEvent} event
+     */
+    _handleKeyDown(event) {
+        if (event.key === 'Escape') {
+            // Close dialogs in reverse order of activation (LIFO)
+            const activeDialogIds = Array.from(this.activeDialogs);
+            for (let i = activeDialogIds.length - 1; i >= 0; i--) {
+                const id = activeDialogIds[i];
+                if (this.options[id].closeOnEscape) {
+                    this.close(id);
+                    break; // Only close the topmost dialog
+                }
+            }
+        }
+    }
+    
+    /**
+     * Save dialog states before page unloads
+     * @private
+     */
+    _handleBeforeUnload() {
+        // Save all active dialog states
+        this.activeDialogs.forEach(id => {
+            const options = this.options[id];
+            if (options.persist) {
+                window.state.set(options.stateKey, true, true);
+            }
+        });
+    }
+    
+    /**
+     * Restore dialog states on page load
+     * @private
+     */
+    _restoreDialogs() {
+        // Restore dialogs that were open
+        Object.keys(this.options).forEach(id => {
+            const options = this.options[id];
+            if (options.persist && options.restoreOnLoad) {
+                const isOpen = window.state.get(options.stateKey, false);
+                if (isOpen) {
+                    // Use setTimeout to ensure DOM is fully loaded
+                    setTimeout(() => this.open(id), 0);
+                }
+            }
+        });
+    }
+    
+    /**
+     * Clean up event listeners
+     * @public
+     */
+    destroy() {
+        // Remove global event listeners
+        document.removeEventListener('keydown', this._handleKeyDown);
+        window.removeEventListener('beforeunload', this._handleBeforeUnload);
+        
+        // Remove dialog-specific event listeners
+        Object.keys(this.outsideClickHandlers).forEach(id => {
+            const dialog = this.dialogs[id];
+            const handler = this.outsideClickHandlers[id];
+            if (dialog && handler) {
+                dialog.removeEventListener('click', handler);
+            }
+        });
+        
+        // Clear dialog tracking
+        this.dialogs = {};
+        this.options = {};
+        this.escapeHandlers = {};
+        this.outsideClickHandlers = {};
+        this.activeDialogs.clear();
+    }
+}
+
+/**
  * Tab system manager
  * @class
  */
@@ -233,8 +528,12 @@ class TabManager {
 // Create global state manager instance
 window.state = new StateManager();
 
-// Export TabManager for global use
+// Export managers for global use
 window.TabManager = TabManager;
+window.DialogManager = DialogManager;
+
+// Create global dialog manager
+window.dialogs = new DialogManager();
 
 // Theme toggle functionality
 document.addEventListener('DOMContentLoaded', () => {

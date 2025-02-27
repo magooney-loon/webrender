@@ -1,64 +1,168 @@
 class TelegramManager {
     constructor() {
+        // UI Elements
         this.telegramToggle = document.querySelector('[data-telegram-toggle]');
         this.telegramDialog = document.querySelector('[data-telegram-dialog]');
         this.enableInput = document.querySelector('[data-telegram-enable]');
         this.chatIdInput = document.querySelector('[data-telegram-chat-id]');
         this.saveButton = document.querySelector('[data-telegram-save]');
         this.cancelButton = document.querySelector('[data-telegram-cancel]');
+        this.statusElement = document.querySelector('[data-telegram-status]');
 
-        // Initialize state
-        this.state = window.state;
+        // Default settings
+        this.defaultSettings = { 
+            enabled: false, 
+            chatId: '' 
+        };
+
+        // Dialog ID
+        this.dialogId = 'telegram-settings';
+
+        // Initialize
+        this.init();
+    }
+
+    /**
+     * Initialize the telegram manager
+     * @private
+     */
+    init() {
+        // Register dialog with manager
+        this.registerDialog();
+        
+        // Restore settings state and bind events
         this.restoreState();
         this.bindEvents();
-    }
-
-    restoreState() {
-        const settings = this.state.get('telegramSettings', { enabled: false, chatId: '' });
-        this.enableInput.checked = settings.enabled;
-        this.chatIdInput.value = settings.chatId;
-    }
-
-    bindEvents() {
-        this.telegramToggle?.addEventListener('click', () => this.showDialog());
-        this.saveButton?.addEventListener('click', () => this.saveSettings());
-        this.cancelButton?.addEventListener('click', () => this.hideDialog());
         
-        // Close on overlay click
-        this.telegramDialog?.addEventListener('click', (e) => {
-            if (e.target === this.telegramDialog) {
-                this.hideDialog();
-            }
+        // Subscribe to state changes
+        window.state.subscribe('telegramSettings', this.handleStateChange.bind(this));
+        
+        // Update UI to reflect current state
+        this.updateUI();
+    }
+
+    /**
+     * Register dialog with the DialogManager
+     * @private
+     */
+    registerDialog() {
+        if (!this.telegramDialog) return;
+        
+        window.dialogs.register('[data-telegram-dialog]', {
+            id: this.dialogId,
+            stateKey: 'telegramDialogOpen',
+            persist: true,
+            closeOnEscape: true,
+            closeOnOutsideClick: true,
+            onOpen: () => this.restoreState(),
+            onClose: null
         });
     }
 
-    showDialog() {
-        this.telegramDialog?.setAttribute('data-active', 'true');
-        document.body.classList.add('no-scroll');
+    /**
+     * Restore state from StateManager
+     * @private
+     */
+    restoreState() {
+        const settings = window.state.get('telegramSettings', this.defaultSettings);
+        this.enableInput.checked = settings.enabled;
+        this.chatIdInput.value = settings.chatId || '';
     }
 
-    hideDialog() {
-        this.telegramDialog?.setAttribute('data-active', 'false');
-        document.body.classList.remove('no-scroll');
+    /**
+     * Bind event listeners
+     * @private
+     */
+    bindEvents() {
+        // Toggle dialog open/close
+        this.telegramToggle?.addEventListener('click', () => {
+            window.dialogs.open(this.dialogId);
+        });
+        
+        // Save button
+        this.saveButton?.addEventListener('click', () => this.saveSettings());
+        
+        // Cancel button
+        this.cancelButton?.addEventListener('click', () => {
+            window.dialogs.close(this.dialogId);
+        });
+        
+        // Handle form submission
+        const form = this.telegramDialog?.querySelector('form');
+        form?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.saveSettings();
+        });
     }
 
+    /**
+     * Handle settings state changes from the StateManager
+     * @param {StateChangeEvent} event - State change event
+     * @private
+     */
+    handleStateChange(event) {
+        console.log('Telegram settings changed:', event);
+        this.updateUI();
+    }
+
+    /**
+     * Update UI elements based on current state
+     * @private
+     */
+    updateUI() {
+        const settings = window.state.get('telegramSettings', this.defaultSettings);
+        
+        // Update status indicator if it exists
+        if (this.statusElement) {
+            this.statusElement.setAttribute('data-status', settings.enabled ? 'enabled' : 'disabled');
+            this.statusElement.textContent = settings.enabled ? 'Enabled' : 'Disabled';
+        }
+        
+        // Update toggle button state if needed
+        if (this.telegramToggle) {
+            this.telegramToggle.setAttribute('data-active', settings.enabled.toString());
+        }
+    }
+
+    /**
+     * Save telegram settings to state manager
+     * @public
+     */
     saveSettings() {
         const settings = {
             enabled: this.enableInput.checked,
-            chatId: this.chatIdInput.value
+            chatId: this.chatIdInput.value.trim()
         };
 
-        // Save to state manager
-        this.state.set('telegramSettings', settings, true);
+        // Validate chat ID if enabled
+        if (settings.enabled && !settings.chatId) {
+            alert('Please enter a valid Chat ID when enabling Telegram notifications.');
+            this.chatIdInput.focus();
+            return;
+        }
+
+        // Save to state manager (persist to localStorage)
+        window.state.set('telegramSettings', settings, true);
         
         // Here you would normally save these settings to your backend
         console.log('Saving telegram settings:', settings);
         
-        this.hideDialog();
+        // Close dialog
+        window.dialogs.close(this.dialogId);
+    }
+    
+    /**
+     * Clean up event listeners and subscriptions
+     * @public
+     */
+    destroy() {
+        // Unsubscribe from state changes
+        window.state.unsubscribe('telegramSettings', this.handleStateChange.bind(this));
     }
 }
 
 // Initialize when DOM is ready
+let telegramManager;
 document.addEventListener('DOMContentLoaded', () => {
-    new TelegramManager();
+    telegramManager = new TelegramManager();
 }); 
