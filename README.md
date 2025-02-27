@@ -14,6 +14,7 @@ Lightweight, extensible Go HTTP server with:
 - Templating engine for HTML views
 - Telegram notifications
 - Dark/Light themes
+- Embedded SQLite database with transaction support
 
 ## Quick Start
 
@@ -35,7 +36,7 @@ go build -o server .
 - [Configuration Guide](/docs/CONFIGURATION.md) - Server configuration options
 - [Templating & API](/docs/TEMPLATING.md) - Template engine and REST API structure
 - [Authentication Guide](/docs/AUTH.md) - Session-based auth system details
-- [Database Guide](/docs/DB.md) - SQLite implementation (WIP)
+- [Database Guide](/docs/DB.md) - SQLite singleton implementation
 - [CSS Architecture](/docs/CSS.md) - Data-attribute utility approach
 - [JavaScript Architecture](/docs/JAVASCRIPT.md) - Component system and data-attribute integration
 
@@ -45,18 +46,41 @@ go build -o server .
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/magooney-loon/webserver/internal/config"
 	"github.com/magooney-loon/webserver/internal/core/middleware"
 	"github.com/magooney-loon/webserver/internal/core/server"
+	"github.com/magooney-loon/webserver/internal/database"
 )
 
 func main() {
 	// Load config with structured logging
-	cfg, log := config.LoadWithLogging()
+	cfg, log := config.LoadWithOptions(
+		config.WithEnvironment("development"),
+		config.WithServerPort(8080),
+	)
 
-	// Define routes with middleware
+	// Initialize database with WAL mode
+	dbConfig := database.DefaultConfig()
+	dbConfig.Path = "./data/app.db"
+	dbConfig.WALMode = true
+	dbConfig.AutoMigrate = false
+
+	if err := database.Initialize(dbConfig); err != nil {
+		log.Fatal("database init failed", map[string]interface{}{
+			"error": err.Error(),
+		})
+	}
+	defer func() {
+		db, _ := database.GetInstance()
+		db.Close()
+	}()
+
+	// Define API routes with middleware
 	api := server.RouteGroup{
 		Prefix: "/api/v1",
 		Middleware: []middleware.Middleware{
@@ -64,12 +88,14 @@ func main() {
 		},
 		Routes: []server.Route{
 			{
-				Path:    "/resource",
+				Path:    "/users",
 				Method:  http.MethodGet,
-				Handler: resourceHandler,
-				Middleware: []middleware.Middleware{
-					// Route-specific middleware
-				},
+				Handler: listUsersHandler,
+			},
+			{
+				Path:    "/users/:id",
+				Method:  http.MethodGet,
+				Handler: getUserHandler,
 			},
 		},
 	}
@@ -77,7 +103,7 @@ func main() {
 	// Start server with options
 	srv := server.New(cfg, log,
 		server.WithRouteGroup(api),
-		server.WithGlobalMiddleware(customMiddleware),
+		server.WithGlobalMiddleware(middleware.RequestID(middleware.RequestIDConfig{})),
 	)
 	
 	if err := srv.Start(); err != nil {
@@ -86,7 +112,38 @@ func main() {
 		})
 	}
 }
-```
+
+// Database-integrated handler example
+func getUserHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	
+	// Get user ID from path params
+	userID := r.PathValue("id")
+	
+	// Get database singleton
+	db, _ := database.GetInstance()
+	
+	// Query user
+	var user struct {
+		ID       int64     `json:"id"`
+		Username string    `json:"username"`
+		Email    string    `json:"email"`
+		Created  time.Time `json:"created_at"`
+	}
+	
+	row := db.QueryRow(ctx, 
+		"SELECT id, username, email, created_at FROM users WHERE id = ?", 
+		userID)
+	
+	if err := row.Scan(&user.ID, &user.Username, &user.Email, &user.Created); err != nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(user)
+}
 
 ### Default System APIs
 
@@ -228,7 +285,46 @@ type RouteGroup struct {
 }
 ```
 
-### 2. Middleware System
+### 2. Database System
+
+The database uses a singleton pattern with connection pooling:
+
+```go
+// Database represents the SQLite database instance
+type Database struct {
+    db *sql.DB        // Underlying sql.DB instance
+    config *Config    // Database configuration
+    mu sync.RWMutex   // Mutex for thread safety
+    pool *Pool        // Connection pool
+    metrics *Metrics  // Performance metrics
+    stmtCache map[string]*sql.Stmt // Statement cache
+}
+
+// Config holds the database configuration
+type Config struct {
+    Path string             // File path to SQLite database
+    PoolSize int            // Maximum connections in pool
+    WALMode bool            // Write-Ahead Logging mode
+    AutoMigrate bool        // Apply migrations on startup
+    // Other configuration options...
+}
+
+// Simple usage:
+dbConfig := database.DefaultConfig()
+dbConfig.Path = "./data/app.db"
+database.Initialize(dbConfig)
+
+// Get singleton instance anywhere in code
+db, _ := database.GetInstance()
+
+// Query with timeout
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+defer cancel()
+
+row := db.QueryRow(ctx, "SELECT id, name FROM users WHERE id = ?", 1)
+```
+
+### 3. Middleware System
 
 The middleware system follows a composable chain pattern:
 
@@ -261,283 +357,104 @@ func RequestID(config RequestIDConfig) Middleware {
 }
 ```
 
-### 3. Response Writer Wrapping
+## Database Operations
 
-Custom response writer captures metrics:
-
-```go
-// responseWriter wraps http.ResponseWriter to capture response data
-type responseWriter struct {
-    http.ResponseWriter
-    status int   // HTTP status code
-    size   int64 // Response size in bytes
-}
-
-func (rw *responseWriter) WriteHeader(statusCode int) {
-    rw.status = statusCode
-    rw.ResponseWriter.WriteHeader(statusCode)
-}
-
-func (rw *responseWriter) Write(b []byte) (int, error) {
-    size, err := rw.ResponseWriter.Write(b)
-    rw.size += int64(size)
-    return size, err
-}
-```
-
-### 4. Flow Control and Lifecycle
-
-The server implements graceful startup and shutdown:
+### Basic CRUD Operations
 
 ```go
-// Start initializes and starts the HTTP server
-func (s *Server) Start() error {
-    // Setup routes first
-    s.setupRoutes()
-    
-    // Apply all middleware
-    handler := s.applyMiddleware(s.router)
-    
-    // Configure HTTP server
-    addr := fmt.Sprintf("%s:%d", s.cfg.Server.Host, s.cfg.Server.Port)
-    s.srv = &http.Server{
-        Addr:           addr,
-        Handler:        handler,
-        ReadTimeout:    s.cfg.Server.ReadTimeout,
-        WriteTimeout:   s.cfg.Server.WriteTimeout,
-        MaxHeaderBytes: int(s.cfg.Server.MaxHeaderSize),
-    }
-    
-    // Start HTTP server in background
-    go s.startHTTPServer(addr)
-    
-    // Wait for shutdown signal
-    return s.waitForShutdown()
-}
-
-// waitForShutdown handles graceful shutdown on signals
-func (s *Server) waitForShutdown() error {
-    quit := make(chan os.Signal, 1)
-    signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-    
-    <-quit
-    s.log.Info("shutting down server", nil)
-    
-    ctx, cancel := context.WithTimeout(
-        context.Background(), 
-        s.cfg.Server.ShutdownTimeout,
-    )
+// Create a record
+func createUser(username, email, password string) (int64, error) {
+    db, _ := database.GetInstance()
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()
     
-    // Gracefully shutdown HTTP server
-    if err := s.srv.Shutdown(ctx); err != nil {
-        return fmt.Errorf("server shutdown error: %v", err)
+    result, err := db.Exec(ctx, 
+        "INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
+        username, email, hashPassword(password))
+    if err != nil {
+        return 0, err
     }
     
-    // Wait for all handlers to complete
-    s.wg.Wait()
-    close(s.shutdown)
+    return result.LastInsertId()
+}
+
+// Read a record
+func getUser(id int64) (*User, error) {
+    db, _ := database.GetInstance()
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
     
-    return nil
+    row := db.QueryRow(ctx, 
+        "SELECT id, username, email, created_at FROM users WHERE id = ?", id)
+    
+    var user User
+    if err := row.Scan(&user.ID, &user.Username, &user.Email, &user.CreatedAt); err != nil {
+        return nil, err
+    }
+    
+    return &user, nil
+}
+
+// Update a record
+func updateUserEmail(id int64, email string) error {
+    db, _ := database.GetInstance()
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+    
+    _, err := db.Exec(ctx, 
+        "UPDATE users SET email = ?, updated_at = ? WHERE id = ?",
+        email, time.Now(), id)
+    
+    return err
+}
+
+// Delete a record
+func deleteUser(id int64) error {
+    db, _ := database.GetInstance()
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+    
+    _, err := db.Exec(ctx, "DELETE FROM users WHERE id = ?", id)
+    return err
 }
 ```
 
-### 5. Middleware Configuration
-
-Detailed configuration for middleware:
+### Using Transactions
 
 ```go
-// Config represents the unified configuration for all middleware
-type Config struct {
-    // Logging configuration
-    Logging struct {
-        Enabled        bool     // Enable/disable logging
-        IncludeHeaders bool     // Include request headers in logs
-        HeadersToLog   []string // Specific headers to log
-        SkipPaths      []string // Paths to skip logging
-    }
-
-    // Security configuration
-    Security struct {
-        // CORS settings
-        CORS CORSConfig
-        // Rate Limiting settings
-        RateLimit RateLimitConfig
-        // Security Headers
-        Headers SecurityHeadersConfig
-        // Auth settings
-        Auth AuthConfig
-    }
-
-    // Request tracking configuration
-    RequestTracking struct {
-        Enabled          bool          // Enable request tracking
-        HeaderName       string        // Request ID header name
-        ContextKey       string        // Context key for request ID
-        GenerateCustomID func() string // Custom ID generator
-    }
-}
-```
-
-## Request Processing Lifecycle
-
-The HTTP request lifecycle:
-
-1. **Transport Layer Reception**: Raw HTTP request arrives at the server's TCP port
-   ```go
-   // Handled by net/http.Server.ListenAndServe()
-   ```
-
-2. **Request Context Creation**: The request is wrapped with context and tracking IDs
-   ```go
-   // Inside RequestID middleware
-   requestID := uuid.New().String()
-   ctx := context.WithValue(r.Context(), requestIDKey, requestID)
-   r = r.WithContext(ctx)
-   w.Header().Set(config.HeaderName, requestID)
-   ```
-
-3. **Middleware Chain Processing**: Request flows through the middleware chain
-   ```go
-   // Middleware chain execution
-   func (c *Chain) Then(h http.Handler) http.Handler {
-       // Apply middleware in reverse order (last middleware executes first)
-       for i := len(c.middlewares) - 1; i >= 0; i-- {
-           h = c.middlewares[i](h)
-       }
-       return h
-   }
-   ```
-
-4. **Route Matching**: Request is matched to a registered route
-   ```go
-   // Router implementation
-   methodRouter := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-       // Look up the handler for this method
-       if handler, ok := methodHandlers[r.Method]; ok {
-           handler(w, r)
-       } else {
-           // Method not allowed
-           w.Header().Set("Allow", getAllowedMethods(methodHandlers))
-           http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-       }
-   })
-   ```
-
-5. **Handler Execution**: Route handler processes the request and generates response
-   ```go
-   // Example handler
-   func resourceHandler(w http.ResponseWriter, r *http.Request) {
-       // Parse request
-       var req RequestBody
-       if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-           http.Error(w, "Bad request", http.StatusBadRequest)
-           return
-       }
-       
-       // Process and generate response
-       response := processRequest(req)
-       
-       // Write response
-       w.Header().Set("Content-Type", "application/json")
-       json.NewEncoder(w).Encode(response)
-   }
-   ```
-
-6. **Response Middleware Processing**: Response flows back through middleware chain
-   ```go
-   // Response is processed in reverse middleware order
-   // Each middleware can modify the response on the way out
-   ```
-
-7. **Metrics Collection**: Response metrics are captured during processing
-   ```go
-   // In metricsMiddleware
-   s.metrics.RecordRequest(
-       r.URL.Path,
-       r.Method,
-       wrapped.status,
-       time.Since(start),
-       r.ContentLength,
-       wrapped.size,
-   )
-   ```
-
-8. **Response Delivery**: HTTP response is delivered to client
-   ```go
-   // Handled by net/http.ResponseWriter implementations
-   ```
-
-## Advanced Usage Examples
-
-### Custom Rate-Limited API with Database Transactions
-
-```go
-// Define the rate limited API group
-apiGroup := server.RouteGroup{
-    Prefix: "/api/v1",
-    Middleware: []middleware.Middleware{
-        middleware.CORS(middleware.CORSConfig{
-            AllowedOrigins: []string{"https://example.com"},
-            AllowedMethods: []string{"GET", "POST", "PUT", "DELETE"},
-        }),
-        middleware.RateLimit(middleware.RateLimitConfig{
-            Enabled:  true,
-            Requests: 100,
-            Window:   time.Minute,
-            ByIP:     true,
-        }),
-    },
-    Routes: []server.Route{
-        {
-            Path:    "/transactions",
-            Method:  http.MethodPost,
-            Handler: transactionHandler,
-            Middleware: []middleware.Middleware{
-                middleware.SessionAuth(middleware.AuthConfig{
-                    Enabled:    true,
-                    CookieName: "session_token",
-                }),
-                transactionMiddleware, // Custom middleware for DB transactions
-            },
-        },
-    },
-}
-
-// Custom middleware for database transactions
-func transactionMiddleware(next http.Handler) http.Handler {
-    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        // Start transaction
-        tx, err := db.Begin()
-if err != nil {
-            http.Error(w, "Failed to start transaction", http.StatusInternalServerError)
-            return
+// Create an order with items in a transaction
+func createOrder(ctx context.Context, order Order) (int64, error) {
+    db, _ := database.GetInstance()
+    
+    var orderID int64
+    err := db.Transaction(ctx, func(tx *database.Tx) error {
+        // Insert order
+        result, err := tx.Exec(ctx, 
+            "INSERT INTO orders (user_id, total) VALUES (?, ?)",
+            order.UserID, order.Total)
+        if err != nil {
+            return err
         }
         
-        // Store transaction in request context
-        ctx := context.WithValue(r.Context(), txKey, tx)
-        r = r.WithContext(ctx)
-        
-        // Use custom response writer to track if transaction should commit
-        tw := &txResponseWriter{
-            ResponseWriter: w,
-            status:         http.StatusOK,
+        orderID, err = result.LastInsertId()
+        if err != nil {
+            return err
         }
         
-        // Call next handler
-        next.ServeHTTP(tw, r)
-        
-        // Commit or rollback based on response status
-        if tw.status >= 200 && tw.status < 300 {
-            if err := tx.Commit(); err != nil {
-                log.Printf("Transaction commit failed: %v", err)
-            }
-        } else {
-            if err := tx.Rollback(); err != nil {
-                log.Printf("Transaction rollback failed: %v", err)
+        // Insert order items
+        for _, item := range order.Items {
+            _, err = tx.Exec(ctx, 
+                "INSERT INTO order_items (order_id, product_id, quantity) VALUES (?, ?, ?)",
+                orderID, item.ProductID, item.Quantity)
+            if err != nil {
+                return err
             }
         }
+        
+        return nil
     })
+    
+    return orderID, err
 }
 ```
 
@@ -607,44 +524,13 @@ type Config struct {
     // Security settings
     Security struct {
         // CORS settings
-        CORS struct {
-            Enabled          bool     // Enable/disable CORS
-            AllowedOrigins   []string // Allowed origins
-            AllowedMethods   []string // Allowed HTTP methods
-            AllowedHeaders   []string // Allowed request headers
-            ExposedHeaders   []string // Exposed response headers
-            AllowCredentials bool     // Allow credentials
-            MaxAge           int      // Preflight cache time
-        }
-        
-        // Rate limiting
-        RateLimit struct {
-            Enabled  bool                     // Enable rate limiting
-            Requests int                      // Default requests per window
-            Window   time.Duration            // Time window
-            ByIP     bool                     // Enable IP-based limiting
-            ByRoute  bool                     // Enable route-based limiting
-            Routes   map[string]RateLimitRule // Route-specific rules
-        }
-        
-        // Security headers
-        Headers struct {
-            XSSProtection           string // XSS protection
-            ContentTypeOptions      string // Content type options
-            XFrameOptions           string // Frame options
-            ContentSecurityPolicy   string // CSP directives
-            ReferrerPolicy          string // Referrer policy
-            StrictTransportSecurity string // HSTS settings
-            PermissionsPolicy       string // Permissions policy
-        }
-        
-        // Authentication
-        Auth struct {
-            Enabled      bool     // Enable auth
-            Username     string   // Admin username
-            Password     string   // Admin password
-            ExcludePaths []string // Paths not requiring auth
-        }
+        CORS CORSConfig
+        // Rate Limiting settings
+        RateLimit RateLimitConfig
+        // Security Headers
+        Headers SecurityHeadersConfig
+        // Auth settings
+        Auth AuthConfig
     }
     
     // System monitoring
