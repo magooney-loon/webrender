@@ -146,7 +146,8 @@ func (db *Database) getAppliedMigrations(ctx context.Context, tableName string) 
 // loadMigrationFiles loads migration files from the given directory
 func (db *Database) loadMigrationFiles(dir string) ([]Migration, error) {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		return nil, fmt.Errorf("migrations directory does not exist: %s", dir)
+		// Return empty migrations list if directory doesn't exist
+		return []Migration{}, nil
 	}
 
 	var migrations []Migration

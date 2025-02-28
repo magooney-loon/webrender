@@ -59,7 +59,7 @@ func DefaultConfig() Config {
 		ConnMaxIdleTime: 30 * time.Minute,
 		CacheSize:       2000,
 		WALMode:         true,
-		AutoMigrate:     true,
+		AutoMigrate:     false,
 		CacheEnabled:    true,
 		CacheTTL:        5 * time.Minute,
 		CacheMaxItems:   1000,
