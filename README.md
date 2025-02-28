@@ -101,31 +101,6 @@ func main() {
 }
 ```
 
-## Configuration
-
-```yaml
-server:
-  port: 8080
-  read_timeout: 60
-  write_timeout: 60
-  max_header_bytes: 1048576
-
-middleware:
-  cors:
-    allowed_origins: ["*"]
-    max_age: 3600
-  security:
-    hsts: true
-    frame_options: "DENY"
-  
-database:
-  driver: sqlite3
-  datasource: file:app.db?cache=shared&mode=rwc
-  pool:
-    max_open: 25
-    max_idle: 5
-```
-
 ## Documentation
 
 - [Server Architecture](docs/SERVER.md) - Core server design and components

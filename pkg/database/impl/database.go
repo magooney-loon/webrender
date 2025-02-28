@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	dbtypes "github.com/magooney-loon/webserver/types/database"
 	logger "github.com/magooney-loon/webserver/utils/logger"
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 )
@@ -367,4 +368,19 @@ func (db *Database) GetCacheStats() CacheStats {
 // Ping checks if the database connection is alive
 func (db *Database) Ping(ctx context.Context) error {
 	return db.db.PingContext(ctx)
+}
+
+// DB returns the underlying sql.DB instance
+func (db *Database) DB() *sql.DB {
+	return db.db
+}
+
+// Initialize initializes the store
+func (db *Database) Initialize() error {
+	return nil // Already initialized in the singleton pattern
+}
+
+// WithContext returns a new Store with the given context
+func (db *Database) WithContext(ctx context.Context) dbtypes.Store {
+	return db // We manage context per operation
 }
