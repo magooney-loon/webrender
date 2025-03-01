@@ -8,12 +8,20 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fatih/color"
 	types "github.com/magooney-loon/webserver/types/server"
 )
 
 var (
 	loggerInstance *logger
 	loggerOnce     sync.Once
+	levelColors    = map[types.LogLevel]*color.Color{
+		types.DebugLevel: color.New(color.FgCyan),
+		types.InfoLevel:  color.New(color.FgGreen),
+		types.WarnLevel:  color.New(color.FgYellow),
+		types.ErrorLevel: color.New(color.FgRed),
+		types.FatalLevel: color.New(color.FgRed, color.Bold),
+	}
 )
 
 type logger struct {
@@ -66,7 +74,7 @@ func (l *logger) WithContext(ctx context.Context) types.Logger {
 	return l.With(types.Fields{"trace_id": ctx.Value("trace_id")})
 }
 
-func (l *logger) log(level types.LogLevel, msg string, fields ...types.Fields) {
+func (l *logger) log(level types.LogLevel, msg string) {
 	if level < l.config.Level {
 		return
 	}
@@ -75,9 +83,10 @@ func (l *logger) log(level types.LogLevel, msg string, fields ...types.Fields) {
 	defer l.mu.Unlock()
 
 	timestamp := time.Now().UTC().Format("01-02T15:04:05.000Z")
-	logLine := fmt.Sprintf("<%s> [%s:%d] = %s //%s//",
+	levelStr := levelColors[level].Sprintf(level.String())
+	logLine := fmt.Sprintf("<%s> [%s:%d] = %s >> %s",
 		l.config.ServiceName,
-		level.String(),
+		levelStr,
 		level,
 		msg,
 		timestamp,
@@ -96,8 +105,8 @@ func (l *logger) log(level types.LogLevel, msg string, fields ...types.Fields) {
 	}
 }
 
-func (l *logger) Debug(msg string, fields ...types.Fields) { l.log(types.DebugLevel, msg, fields...) }
-func (l *logger) Info(msg string, fields ...types.Fields)  { l.log(types.InfoLevel, msg, fields...) }
-func (l *logger) Warn(msg string, fields ...types.Fields)  { l.log(types.WarnLevel, msg, fields...) }
-func (l *logger) Error(msg string, fields ...types.Fields) { l.log(types.ErrorLevel, msg, fields...) }
-func (l *logger) Fatal(msg string, fields ...types.Fields) { l.log(types.FatalLevel, msg, fields...) }
+func (l *logger) Debug(msg string, fields ...types.Fields) { l.log(types.DebugLevel, msg) }
+func (l *logger) Info(msg string, fields ...types.Fields)  { l.log(types.InfoLevel, msg) }
+func (l *logger) Warn(msg string, fields ...types.Fields)  { l.log(types.WarnLevel, msg) }
+func (l *logger) Error(msg string, fields ...types.Fields) { l.log(types.ErrorLevel, msg) }
+func (l *logger) Fatal(msg string, fields ...types.Fields) { l.log(types.FatalLevel, msg) }
