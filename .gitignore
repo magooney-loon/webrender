@@ -1,4 +1,5 @@
 # Go specific
+/vendor/
 *.exe
 *.exe~
 *.dll
@@ -6,65 +7,99 @@
 *.dylib
 *.test
 *.out
-/vendor/
-go.work
-
-# SQLite
-*.db
-*.db-shm
-*.db-wal
-/data/
-
-# Binary output directory
 /bin/
 /dist/
 
-# IDE specific
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
+# Go workspace file
+go.work
 
-# Environment files
-.env
-.env.local
-.env.*.local
-!.env.example
+# Go build cache
+/.cache/
 
-# Logs
-*.log
-/logs/
+# Local binary directory
+/bin/
+
+# Config files with sensitive data
+/config/
+config/session_keys.json
 
 # Temporary files
-/tmp/
+*.tmp
+*.log
+*.bak
+*~
+
+# Go coverage and profiling
+/coverage/
+*.cov
+*.prof
+*.pprof
+
+# IDE and editor files
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.swp
+*.swo
 .DS_Store
 Thumbs.db
+*.sublime-workspace
+*.sublime-project
 
-# Test coverage
-coverage.txt
-coverage.html
+# Environment variables and secrets
+.env
+.env.local
+*.env.*
+!.env.example
+.envrc
+.secrets
 
-# Web assets
-/web/node_modules/
+# Project-specific build artifacts
+/build/
+/tmp/
 /web/dist/
-/web/tmp/
-*.min.css
-*.min.js
+
+# Air hot-reload
+/tmp/
+
+# Debug files
+debug
+__debug_bin
+debug.test
+
+# Dependencies 
+/node_modules/
+/bower_components/
+
+# SQLite
+*.db
+*.sqlite
+*.sqlite3
+
+# Misc
+*.bak
+*.backup
+*.orig
+.*.kate-swp
+.~lock.*#
+
+# Binary configuration files
+*.conf.compiled
+
+# Log files
+/logs/
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Certificate files
-*.pem
-*.key
-*.crt
-*.csr
-*.srl
+# System Files
+.DS_Store
+Thumbs.db
 
-# Build/Deploy artifacts
-*.tar.gz
-*.zip
-.terraform/
-*.tfstate
-*.tfstate.backup 
+# Generated files and directories
+/generated/
+*_gen.go 
